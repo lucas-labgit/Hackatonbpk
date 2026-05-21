@@ -283,7 +283,7 @@ function friendlyApiErrorMessage(error, fallbackText) {
     normalized.includes("networkerror") ||
     normalized.includes("falha de conexao")
   ) {
-    return "Nao foi possivel conectar ao backend. Confira API_BASE_URL, se a API esta online e se o CORS libera http://127.0.0.1:5500.";
+    return "Nao foi possivel conectar ao backend. Confira API_BASE_URL/SCRAPING_API_BASE_URL, se a API esta online e se o CORS libera http://127.0.0.1:5500.";
   }
 
   return raw;

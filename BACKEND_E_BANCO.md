@@ -79,12 +79,16 @@ Teste local:
 
 ```bash
 curl http://127.0.0.1:8000/api/consultas/status
+curl http://127.0.0.1:8000/api/protocolos
+curl http://127.0.0.1:8000/api/projetos
 curl -X POST http://127.0.0.1:8000/api/consultas/executar \
   -H "Content-Type: application/json" \
   -d '{"limit": 1, "headless": true}'
 ```
 
-Para o front continuar usando o Render para protocolos, mas chamar essa API local apenas para o scraping, edite `config.js`:
+A API local tambem expoe `POST/PATCH/DELETE /api/protocolos`, entao o front consegue editar e remover registros sem depender do Render durante os testes locais.
+
+Para o front usar o Render como backend principal, mas chamar a API local do scraping e do Supabase durante os testes, edite `config.js`:
 
 ```js
 API_BASE_URL: "https://hackatonbpk-1.onrender.com",

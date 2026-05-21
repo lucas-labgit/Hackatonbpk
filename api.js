@@ -12,7 +12,7 @@
   }
 
   function isEnabled() {
-    const baseUrl = apiBaseUrl();
+    const baseUrl = apiBaseUrl() || scrapingApiBaseUrl();
     return Boolean(baseUrl && baseUrl.startsWith("http") && !baseUrl.includes("COLE_A_URL"));
   }
 
@@ -36,14 +36,14 @@
 
     let response;
     try {
-      response = await fetch(`${options.baseUrl || apiBaseUrl()}${endpoint(name, options.params)}`, {
+      response = await fetch(`${options.baseUrl || apiBaseUrl() || scrapingApiBaseUrl()}${endpoint(name, options.params)}`, {
         method: options.method || "GET",
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,
       });
     } catch (error) {
       throw new Error(
-        "Falha de conexao com a API. Verifique se o backend esta online e se o CORS permite http://127.0.0.1:5500."
+        "Falha de conexao com a API. Verifique API_BASE_URL/SCRAPING_API_BASE_URL, se a API esta online e se o CORS permite http://127.0.0.1:5500."
       );
     }
 
@@ -116,12 +116,14 @@
   }
 
   async function getProjects() {
-    const data = await request("projects");
+    const baseUrl = scrapingApiBaseUrl() || undefined;
+    const data = await request("projects", { baseUrl });
     return listFromResponse(data);
   }
 
   async function getCompanies() {
-    const data = await request("companies");
+    const baseUrl = scrapingApiBaseUrl() || undefined;
+    const data = await request("companies", { baseUrl });
     return listFromResponse(data);
   }
 
@@ -159,19 +161,23 @@
 
   async function saveProtocol(companyId, protocol, options = {}) {
     const isUpdate = options.isUpdate ?? Boolean(protocol.id);
+    const baseUrl = scrapingApiBaseUrl() || undefined;
     const data = await request(isUpdate ? "protocol" : "protocolsByCompany", {
       method: isUpdate ? "PATCH" : "POST",
       params: { companyId, protocolId: protocol.id },
       body: backendProtocolPayload(companyId, protocol),
+      baseUrl,
     });
     const saved = itemFromResponse(data, protocol);
     return { ...protocol, ...saved, id: saved?.id || protocol.id };
   }
 
   async function deleteProtocol(companyId, protocolId) {
+    const baseUrl = scrapingApiBaseUrl() || undefined;
     await request("protocol", {
       method: "DELETE",
       params: { companyId, protocolId },
+      baseUrl,
     });
   }
 
