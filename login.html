@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login - Base de Protocolos Públicos</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .login-panel { animation: fadeInUp 0.35s ease; }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(18px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .primary-button:disabled { opacity: 0.6; cursor: not-allowed; }
+      .login-error { min-height: 1.4em; }
+      .login-card h1 { font-size: 1.4rem; }
+    </style>
+  </head>
+  <body>
+    <section class="login-screen" id="loginScreen">
+      <div class="login-panel">
+        <div class="login-media">
+          <!-- TROQUE src pela logo da Prati quando tiver o arquivo -->
+          <img src="imagens/prati_320x360_melhorada.png" alt="Prati Empreendimentos" />
+          <div class="login-media-caption">
+            <span>Acesso corporativo</span>
+            <strong>Prati Empreendimentos</strong>
+          </div>
+        </div>
+
+        <form class="login-card" id="loginForm" autocomplete="on">
+          <p class="eyebrow">Acesso restrito</p>
+          <h1>Entrar no sistema</h1>
+          <span class="login-copy">
+            Informe suas credenciais para acessar e acompanhar os protocolos das empresas parceiras.
+          </span>
+
+          <label>
+            <span>Usuário</span>
+            <input id="usernameInput" type="text" required placeholder="Usuário" autocomplete="username" />
+          </label>
+          <label>
+            <span>Senha</span>
+            <input id="passwordInput" type="password" required placeholder="Senha" autocomplete="current-password" />
+          </label>
+
+          <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
+          <button class="primary-button" type="submit">Acessar</button>
+        </form>
+      </div>
+    </section>
+
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script src="login.js"></script>
+  </body>
+</html>

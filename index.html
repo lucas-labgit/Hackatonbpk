@@ -1,0 +1,409 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Base de Protocolos Publicos</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="appShell">
+      <aside class="sidebar" aria-label="Navegacao principal">
+        <div class="brand">
+  <span class="brand-mark">
+    <img src="imagens/prati_320x360_melhorada.png" alt="Prati Empreendimentos" />
+  </span>
+  <div>
+    <strong>Prati Empreendimentos</strong>
+    <span>Base de Protocolos</span>
+  </div>
+</div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-screen-target="dashboard">
+            <span class="nav-icon" aria-hidden="true"><img src="assets/icon-dashboard.png" alt="" /></span>
+            Painel
+          </button>
+          <button class="nav-item" type="button" data-screen-target="protocols">
+            <span class="nav-icon" aria-hidden="true"><img src="assets/icon-protocol.png" alt="" /></span>
+            Protocolos
+          </button>
+          <button class="nav-item" type="button" data-screen-target="details">
+            <span class="nav-icon" aria-hidden="true"><img src="assets/icon-search.png" alt="" /></span>
+            Detalhes
+          </button>
+        </nav>
+
+     <div class="connection-panel">
+  <span class="status-dot"></span>
+  <div>
+    <strong id="currentCompanyName">Empresa ativa</strong>
+    <span id="companyScopeLabel">Visualizando protocolos da empresa</span>
+  </div>
+</div>
+
+<button class="logout-button" type="button" id="companyShortcutButton">⏻ Sair</button>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Gestao integrada</p>
+            <h1>Base de protocolos</h1>
+            <span class="topbar-subtitle">Cadastro, consulta e acompanhamento de demandas filtradas por empresa.</span>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" type="button" id="powerBiButton">Abrir dashboard</button>
+            <button class="primary-button" type="button" id="newProtocolButton">Novo protocolo</button>
+          </div>
+        </header>
+
+        <div class="screen-tabs" aria-label="Acoes da pagina">
+          <button class="screen-tab active" type="button" id="refreshProtocolsButton">Atualizar protocolos</button>
+        </div>
+
+        <section class="screen active" data-screen="dashboard">
+          <section class="metrics-grid" aria-label="Indicadores">
+            <article class="metric">
+              <span>Total</span>
+              <strong id="totalProtocols">0</strong>
+            </article>
+            <article class="metric">
+              <span>Em andamento</span>
+              <strong id="openProtocols">0</strong>
+            </article>
+            <article class="metric">
+              <span>Prioridade alta</span>
+              <strong id="highPriority">0</strong>
+            </article>
+            <article class="metric">
+              <span>Orgaos integrados</span>
+              <strong id="totalOrgans">0</strong>
+            </article>
+          </section>
+
+          <section class="overview-panel">
+            <div>
+              <p class="eyebrow">Fluxo recomendado</p>
+              <h2>Organize os protocolos por etapas</h2>
+            </div>
+            <div class="workflow-grid">
+              <article>
+                <strong>1. Cadastro</strong>
+                <span>Registre interessado, orgao, setor e assunto.</span>
+              </article>
+              <article>
+                <strong>2. Consulta</strong>
+                <span>Filtre por status ou procure pelo numero do protocolo.</span>
+              </article>
+              <article>
+                <strong>3. Acompanhamento</strong>
+                <span>Abra os detalhes para ver o registro sem aperto visual.</span>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <section class="screen" data-screen="protocols">
+          <section class="protocols-panel" aria-labelledby="protocolsTitle">
+            <div class="panel-heading protocols-heading">
+              <div class="protocols-summary">
+                <h2 id="protocolsTitle">Protocolos cadastrados</h2>
+                <span id="resultCount">0 registros encontrados</span>
+              </div>
+              <div class="filter-row">
+                <div class="company-filter-field" aria-labelledby="companyFilterTitle">
+                  <span id="companyFilterTitle">Empresa</span>
+                  <input
+                    class="company-filter-search"
+                    id="companySearchInput"
+                    type="search"
+                    placeholder="Buscar empresa"
+                  />
+                  <div class="company-filter-grid" id="companyFilterList"></div>
+                </div>
+                <label class="search-field">
+                  <span>Buscar</span>
+                  <input id="searchInput" type="search" placeholder="Numero, interessado ou orgao" />
+                </label>
+                <label>
+                  <span>Status</span>
+                  <select id="statusFilter">
+                    <option value="todos">Todos</option>
+                    <option value="Em andamento">Em andamento</option>
+                    <option value="Concluido">Concluido</option>
+                    <option value="Pendente">Pendente</option>
+                    <option value="Arquivado">Arquivado</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="protocol-list" id="protocolTable"></div>
+          </section>
+        </section>
+
+        <section class="screen" data-screen="details">
+          <section class="details-panel" aria-labelledby="detailsTitle">
+            <div class="panel-heading compact">
+              <div>
+                <h2 id="detailsTitle">Detalhes</h2>
+                <span id="selectedProtocolNumber">Selecione um protocolo</span>
+              </div>
+            </div>
+            <div id="detailsContent" class="details-empty">
+              <strong>Aguardando selecao</strong>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="powerBiDialog" class="powerbi-dialog">
+      <div class="powerbi-frame-wrap powerbi-dashboard-wrap">
+        <div class="powerbi-header dashboard-header">
+          <div>
+            <p class="eyebrow">Consulta de protocolos em orgaos publicos</p>
+            <h2 id="powerBiTitle">Dashboard de Protocolos</h2>
+            <p class="dashboard-subtitle" id="dashboardCompanySubtitle">Instituto Agua e Terra - IAT</p>
+            <p class="dashboard-meta" id="dashboardLastMeta">Ultima consulta: --</p>
+          </div>
+          <button class="icon-button" type="button" id="closePowerBiButton" aria-label="Fechar">x</button>
+        </div>
+
+        <div class="dashboard-toolbar">
+          <button class="primary-button" type="button" id="dashboardRunButton">Atualizar protocolos</button>
+          <button class="ghost-button" type="button" id="dashboardImportButton">Importar planilha</button>
+          <button class="ghost-button" type="button" id="dashboardPdfButton">Gerar PDF</button>
+          <button class="ghost-button" type="button" id="dashboardExportButton">Exportar Excel</button>
+          <button class="primary-button" type="button" id="dashboardNewProtocolButton">Novo protocolo</button>
+          <input type="file" id="dashboardImportInput" accept=".csv,.tsv,.txt" class="hidden" />
+        </div>
+
+        <section class="dashboard-summary-grid">
+          <article class="dash-card dash-card-total">
+            <span>Total de protocolos</span>
+            <strong id="dashTotal">0</strong>
+            <small>base geral</small>
+          </article>
+          <article class="dash-card dash-card-active">
+            <span>Ativos</span>
+            <strong id="dashActive">0</strong>
+            <small>em acompanhamento</small>
+          </article>
+          <article class="dash-card dash-card-finished">
+            <span>Finalizados</span>
+            <strong id="dashFinished">0</strong>
+            <small>concluidos/arquivados</small>
+          </article>
+          <article class="dash-card dash-card-changed">
+            <span>Mudanca recente</span>
+            <strong id="dashChanged">0</strong>
+            <small>status alterado</small>
+          </article>
+          <article class="dash-card dash-card-error">
+            <span>Erro de consulta</span>
+            <strong id="dashError">0</strong>
+            <small>falhas separadas</small>
+          </article>
+          <article class="dash-card dash-card-updated">
+            <span>Ultima atualizacao geral</span>
+            <strong id="dashLastUpdate" class="dash-card-time">--</strong>
+            <small id="dashStale">0 sem atualizacao</small>
+          </article>
+        </section>
+
+        <section class="dashboard-filter-panel">
+          <h3>Filtros</h3>
+          <div class="dashboard-filters-grid">
+            <label>
+              <span>Projeto/Empreendimento</span>
+              <select id="dashFilterProject"><option value="todos">Todos</option></select>
+            </label>
+            <label>
+              <span>Orgao/site</span>
+              <select id="dashFilterOrgan"><option value="todos">Todos</option></select>
+            </label>
+            <label>
+              <span>Status</span>
+              <select id="dashFilterStatus"><option value="todos">Todos</option></select>
+            </label>
+            <label>
+              <span>Situacao</span>
+              <select id="dashFilterSituation"><option value="todos">Todos</option></select>
+            </label>
+            <label>
+              <span>Periodo</span>
+              <select id="dashFilterPeriod">
+                <option value="todos">Todo periodo</option>
+                <option value="7">Ultimos 7 dias</option>
+                <option value="15">Ultimos 15 dias</option>
+                <option value="30">Ultimos 30 dias</option>
+                <option value="60">Ultimos 60 dias</option>
+              </select>
+            </label>
+          </div>
+          <div class="dashboard-filter-toggles">
+            <label class="dashboard-toggle"><input type="checkbox" id="dashOnlyChanged" /> Somente com mudanca</label>
+            <label class="dashboard-toggle"><input type="checkbox" id="dashOnlyError" /> Somente com erro</label>
+          </div>
+        </section>
+
+        <section class="dashboard-charts-grid">
+          <article class="dashboard-chart-card">
+            <h4>Protocolos por status</h4>
+            <div id="dashChartStatus"></div>
+          </article>
+          <article class="dashboard-chart-card">
+            <h4>Protocolos por empreendimento</h4>
+            <div id="dashChartProject"></div>
+          </article>
+          <article class="dashboard-chart-card">
+            <h4>Protocolos por orgao/site</h4>
+            <div id="dashChartOrgan"></div>
+          </article>
+        </section>
+
+        <section class="dashboard-table-panel">
+          <div class="dashboard-table-header">
+            <h4>Tabela de protocolos</h4>
+            <button class="ghost-button dashboard-link-button" type="button" id="dashResetFiltersButton">Ver todos</button>
+          </div>
+          <div class="dashboard-table-wrap">
+            <table class="dashboard-table" aria-label="Tabela do dashboard">
+              <thead>
+                <tr>
+                  <th>Projeto</th>
+                  <th>Orgao/site</th>
+                  <th>Protocolo</th>
+                  <th>Status atual</th>
+                  <th>Status anterior</th>
+                  <th>Situacao</th>
+                  <th>Observacao</th>
+                  <th>Data/hora consulta</th>
+                  <th>Duracao</th>
+                  <th>Mudou</th>
+                  <th>Erro</th>
+                  <th>Acoes</th>
+                </tr>
+              </thead>
+              <tbody id="dashTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="dashboard-notes-grid">
+          <article class="dashboard-note-card">
+            <h4>Mudancas recentes</h4>
+            <ul id="dashChangesList"></ul>
+          </article>
+          <article class="dashboard-note-card">
+            <h4>Erros e sem atualizacao</h4>
+            <div class="dashboard-note-columns">
+              <div>
+                <h5>Com erro</h5>
+                <ul id="dashErrorsList"></ul>
+              </div>
+              <div>
+                <h5>Sem atualizacao</h5>
+                <ul id="dashStaleList"></ul>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+    </dialog>
+
+    <dialog id="dashboardHistoryDialog" class="dashboard-history-dialog">
+      <div class="dashboard-history-wrap">
+        <div class="powerbi-header dashboard-history-header">
+          <div>
+            <p class="eyebrow">Historico</p>
+            <h3 id="dashboardHistoryTitle">Consultas anteriores</h3>
+            <p class="dashboard-meta" id="dashboardHistoryMeta">Carregando historico...</p>
+          </div>
+          <button class="icon-button" type="button" id="closeDashboardHistoryButton" aria-label="Fechar">x</button>
+        </div>
+        <div class="dashboard-history-content">
+          <div id="dashboardHistoryBody"></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="protocolDialog">
+      <form method="dialog" class="protocol-form" id="protocolForm">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Registro</p>
+            <h2 id="dialogTitle">Novo protocolo</h2>
+          </div>
+          <button class="icon-button" type="button" id="closeDialogButton" aria-label="Fechar">x</button>
+        </div>
+
+        <input type="hidden" id="protocolId" />
+
+        <div class="form-grid">
+          <label>
+            <span>Numero do protocolo</span>
+            <input id="numberInput" required maxlength="24" />
+          </label>
+          <label>
+            <span>Data de abertura</span>
+            <input id="openedAtInput" required type="date" />
+          </label>
+          <label>
+            <span>Interessado</span>
+            <input id="personInput" required maxlength="80" />
+          </label>
+          <label>
+            <span>Documento</span>
+            <input id="documentInput" maxlength="32" />
+          </label>
+          <label>
+            <span>Orgao publico</span>
+            <select id="organInput" required></select>
+          </label>
+          <label>
+            <span>Setor responsavel</span>
+            <input id="departmentInput" required maxlength="80" />
+          </label>
+          <label>
+            <span>Status</span>
+            <select id="statusInput" required>
+              <option>Em andamento</option>
+              <option>Concluido</option>
+              <option>Pendente</option>
+              <option>Arquivado</option>
+            </select>
+          </label>
+          <label>
+            <span>Prioridade</span>
+            <select id="priorityInput" required>
+              <option>Baixa</option>
+              <option>Media</option>
+              <option>Alta</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          <span>Assunto</span>
+          <input id="subjectInput" required maxlength="120" />
+        </label>
+        <label>
+          <span>Observacoes</span>
+          <textarea id="notesInput" rows="4" maxlength="320"></textarea>
+        </label>
+
+        <div class="modal-actions">
+          <button class="ghost-button" type="button" id="cancelButton">Cancelar</button>
+          <button class="primary-button" type="submit">Salvar protocolo</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
