@@ -177,6 +177,7 @@
           <button class="ghost-button" type="button" id="dashboardPdfButton">Gerar PDF</button>
           <button class="ghost-button" type="button" id="dashboardExportButton">Exportar Excel</button>
           <button class="primary-button" type="button" id="dashboardNewProtocolButton">Novo protocolo</button>
+          <button class="ghost-button dashboard-close-action" type="button" id="dashboardCloseButton">Fechar dashboard</button>
           <input type="file" id="dashboardImportInput" accept=".csv,.tsv,.txt" class="hidden" />
         </div>
 
@@ -356,12 +357,16 @@
             <input id="personInput" required maxlength="80" />
           </label>
           <label>
-            <span>Documento</span>
+            <span>Documento/CPF/CNPJ</span>
             <input id="documentInput" maxlength="32" />
           </label>
           <label>
             <span>Orgao publico</span>
             <select id="organInput" required></select>
+          </label>
+          <label>
+            <span>Projeto</span>
+            <select id="projectInput" required></select>
           </label>
           <label>
             <span>Setor responsavel</span>
@@ -383,6 +388,17 @@
               <option>Media</option>
               <option>Alta</option>
             </select>
+          </label>
+          <label>
+            <span>Tipo de consulta</span>
+            <select id="queryTypeInput">
+              <option value="">Sem scraping</option>
+              <option value="prefeitura_toledo">Prefeitura Toledo</option>
+            </select>
+          </label>
+          <label class="wide-form-field">
+            <span>Link de consulta</span>
+            <input id="queryUrlInput" type="url" maxlength="400" placeholder="https://..." />
           </label>
         </div>
 

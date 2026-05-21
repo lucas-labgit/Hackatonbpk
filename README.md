@@ -32,9 +32,10 @@ Para o backend atual do Render, o frontend esta configurado para ler:
 
 ```text
 GET /protocolos
-GET /projetos
-GET /empresas
-GET /historico
+GET /api/protocolos
+GET /api/projetos
+GET /api/empresas
+GET /api/historico
 ```
 
 Como o backend publicado ainda nao expoe rotas de login, cadastro, edicao ou remocao no OpenAPI, `config.js` esta com `AUTH_ENABLED: false` e `READ_ONLY_API: true`. Assim, a tela le os protocolos do Render, mas novas alteracoes feitas no frontend continuam locais ate o backend ter rotas `POST`, `PUT` e `DELETE`.

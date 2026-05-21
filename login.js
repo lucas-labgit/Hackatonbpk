@@ -45,7 +45,8 @@ async function handleLogin(event) {
 
   const config = window.BPK_CONFIG || {};
   const apiUrl = String(config.API_BASE_URL || "").replace(/\/+$/, "");
-  const useApi = Boolean(apiUrl && apiUrl.startsWith("http"));
+  const authEnabled = config.AUTH_ENABLED !== false;
+  const useApi = authEnabled && Boolean(apiUrl && apiUrl.startsWith("http"));
 
   if (useApi) {
     try {

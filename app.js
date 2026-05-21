@@ -14,7 +14,7 @@ const COMPANY_LIST = [
   {
     id: "emp02",
     name: "Cartorio Reg. Imoveis",
-    filterLabel: ["Cartorio", "Reg.", "Imoveis"],
+    filterLabel: ["Cartório", "Reg.", "Imóveis"],
     iconImage: "imagens/icones/IMOVEIS.png",
     image: "imagens/filtro/IMOVEIS.png",
     powerBiUrl: "https://app.powerbi.com/",
@@ -57,7 +57,7 @@ const COMPANY_LIST = [
   {
     id: "emp08",
     name: "Corpo de Bombeiros",
-    filterLabel: ["Corpo de", "Bombeiros"],
+    filterLabel: ["Corpo", "de", "Bombeiros"],
     iconImage: "imagens/icones/BOMBEIROS.png",
     image: "imagens/filtro/BOMBEIROS.png",
     powerBiUrl: "https://app.powerbi.com/",
@@ -76,7 +76,7 @@ const organs = COMPANY_LIST.map((company) => company.name);
 const COMPANY_ORGAN_ALIASES = {
   emp01: ["Prefeitura Toledo", "Prefeitura de Toledo"],
   emp02: ["Cartorio Reg. Imoveis", "Cartório Reg. Imóveis", "Cartório"],
-  emp03: ["IAT", "IAC"],
+  emp03: ["IAT", "IAC", "IPHAN"],
   emp04: ["ANAC"],
   emp05: ["Sanepar", "SANEPAR"],
   emp06: ["Copel", "COPEL"],
@@ -95,7 +95,7 @@ const DASHBOARD_ORGAN_FILTERS = [
   },
   {
     label: "IAT",
-    aliases: ["IAT", "IAC"],
+    aliases: ["IAT", "IAC", "IPHAN"],
   },
   {
     label: "ANAC",
@@ -128,6 +128,7 @@ const state = {
   user: null,
   protocols: [],
   projects: [],
+  companies: [],
   selectedId: null,
   companyQuery: "",
   query: "",
@@ -170,6 +171,7 @@ const els = {
   dashboardPdfButton: document.querySelector("#dashboardPdfButton"),
   dashboardExportButton: document.querySelector("#dashboardExportButton"),
   dashboardNewProtocolButton: document.querySelector("#dashboardNewProtocolButton"),
+  dashboardCloseButton: document.querySelector("#dashboardCloseButton"),
   dashTotal: document.querySelector("#dashTotal"),
   dashActive: document.querySelector("#dashActive"),
   dashFinished: document.querySelector("#dashFinished"),
@@ -221,9 +223,12 @@ const els = {
   personInput: document.querySelector("#personInput"),
   documentInput: document.querySelector("#documentInput"),
   organInput: document.querySelector("#organInput"),
+  projectInput: document.querySelector("#projectInput"),
   departmentInput: document.querySelector("#departmentInput"),
   statusInput: document.querySelector("#statusInput"),
   priorityInput: document.querySelector("#priorityInput"),
+  queryTypeInput: document.querySelector("#queryTypeInput"),
+  queryUrlInput: document.querySelector("#queryUrlInput"),
   subjectInput: document.querySelector("#subjectInput"),
   notesInput: document.querySelector("#notesInput"),
   screenButtons: document.querySelectorAll("[data-screen-target]"),
@@ -291,6 +296,31 @@ function findCompanyByBackendOrgan(organ) {
   );
 }
 
+function queryTypeForOrgan(organ) {
+  const company = findCompanyByName(organ) || findCompanyByBackendOrgan(organ);
+  if (company?.id === "emp01") return "prefeitura_toledo";
+  return "";
+}
+
+function defaultQueryUrlForType(queryType) {
+  return String(config.CONSULTA_URLS?.[queryType] || "").trim();
+}
+
+function applyQueryDefaultsForOrgan(force = false) {
+  if (!els.queryTypeInput) return;
+  const queryType = queryTypeForOrgan(els.organInput?.value);
+  if (force || !els.queryTypeInput.value) {
+    els.queryTypeInput.value = queryType;
+  }
+  if (force && !els.queryTypeInput.value && els.queryUrlInput) {
+    els.queryUrlInput.value = "";
+    return;
+  }
+  if (els.queryUrlInput && !els.queryUrlInput.value) {
+    els.queryUrlInput.value = defaultQueryUrlForType(els.queryTypeInput.value);
+  }
+}
+
 function dashboardOrganMatches(record, selectedOrgan) {
   if (selectedOrgan === "todos") return true;
   const filter = DASHBOARD_ORGAN_FILTERS.find((item) => item.label === selectedOrgan);
@@ -314,7 +344,61 @@ function inferProjectName(record, projects = []) {
     record.nome_projeto ||
     record.empreendimento ||
     record.project;
-  return directProject || "-";
+  if (directProject) return directProject;
+
+  const projectId =
+    record.projeto_id ||
+    record.project_id ||
+    record.empreendimento_id ||
+    record.id_projeto ||
+    record.projectId;
+  if (projectId) {
+    const linkedProject = projects.find((project) => String(project.id) === String(projectId));
+    if (linkedProject?.nome || linkedProject?.name) return linkedProject.nome || linkedProject.name;
+  }
+
+  const searchable = normalize(
+    [
+      record.numero_protocolo,
+      record.number,
+      record.atividade,
+      record.subject,
+      record.situacao,
+      record.observacao,
+      record.notes,
+    ].join(" ")
+  );
+  const mentionedProject = [...projects]
+    .filter((project) => project?.nome || project?.name)
+    .sort((a, b) => String(b.nome || b.name).length - String(a.nome || a.name).length)
+    .find((project) => {
+      const projectName = normalize(project.nome || project.name);
+      return projectName.length > 2 && searchable.includes(projectName);
+    });
+
+  return mentionedProject?.nome || mentionedProject?.name || "-";
+}
+
+function findProjectById(projectId) {
+  return state.projects.find((project) => String(project.id) === String(projectId));
+}
+
+function projectName(project) {
+  return project?.nome || project?.name || "Projeto";
+}
+
+function fallbackProjectForProtocol(protocol) {
+  if (protocol?.projectId) return findProjectById(protocol.projectId);
+  if (protocol?.projeto_id) return findProjectById(protocol.projeto_id);
+  if (protocol?.project && protocol.project !== "-") {
+    const normalizedProject = normalize(protocol.project);
+    return state.projects.find((project) => normalize(projectName(project)) === normalizedProject);
+  }
+  return state.projects[0] || null;
+}
+
+function backendCompanyIdForProject(project) {
+  return project?.empresa_id || project?.company_id || state.companies[0]?.id || "";
 }
 
 function canonicalDashboardOrganName(rawOrgan) {
@@ -340,15 +424,29 @@ function canonicalDashboardStatus(rawStatus) {
 
 function mapBackendProtocol(record, projects = []) {
   const company = findCompanyByBackendOrgan(record.orgao);
-  const updatedAt = record.updated_at || record.data_consulta || record.data_movimentacao || new Date().toISOString();
+  const updatedAt =
+    record.updated_at ||
+    record.ultima_consulta ||
+    record.data_consulta ||
+    record.data_movimentacao ||
+    new Date().toISOString();
   const project = inferProjectName(record, projects);
 
   return {
     id: record.id || createId(),
     number: record.numero_protocolo || record.number || "-",
-    openedAt: String(record.data_movimentacao || record.created_at || updatedAt).slice(0, 10),
+    openedAt: String(record.data_abertura || record.data_movimentacao || record.created_at || updatedAt).slice(0, 10),
     person: record.responsavel || record.person || "-",
-    document: record.document || "",
+    document:
+      record.documento_consulta ||
+      record.documento ||
+      record.cpf_cnpj ||
+      record.cnpj ||
+      record.cpf ||
+      record.document ||
+      "",
+    projectId: record.projeto_id || record.project_id || "",
+    companyId: record.empresa_id || record.company_id || "",
     companyName: company?.name || record.orgao || "-",
     project,
     organ: record.orgao || company?.name || "-",
@@ -356,7 +454,9 @@ function mapBackendProtocol(record, projects = []) {
     status: normalizeBackendStatus(record.status_atual || record.status),
     priority: "Media",
     subject: record.atividade || record.subject || "-",
-    notes: record.situacao || record.notes || "",
+    notes: record.observacao_consulta || record.situacao || record.anotacoes || record.notes || "",
+    queryType: record.tipo_consulta || record.queryType || "",
+    queryUrl: record.link_consulta || record.queryUrl || "",
     updatedAt,
   };
 }
@@ -473,8 +573,8 @@ function mapDashboardHistoryEntry(entry, fallbackRecord) {
   };
 }
 
-function mapDashboardRecord(record) {
-  const project = firstNonEmpty(record, ["projeto", "projeto_nome", "nome_projeto", "empreendimento", "project"], "-");
+function mapDashboardRecord(record, projects = []) {
+  const project = inferProjectName(record, projects);
   const organ = canonicalDashboardOrganName(firstNonEmpty(record, ["orgao", "orgao_site", "site", "empresa", "company_name"], "-"));
   const number = firstNonEmpty(record, ["numero_protocolo", "protocolo", "protocol_number", "number"], "-");
   const statusCurrent = canonicalDashboardStatus(
@@ -543,10 +643,18 @@ async function loadDashboardData() {
   }
 
   try {
-    const dashboardResponse = await api.getDashboard();
+    const projectsRequest = typeof api.getProjects === "function" ? api.getProjects().catch(() => []) : Promise.resolve([]);
+    const companiesRequest = typeof api.getCompanies === "function" ? api.getCompanies().catch(() => []) : Promise.resolve([]);
+    const [dashboardResponse, backendProjects, backendCompanies] = await Promise.all([
+      api.getDashboard(),
+      projectsRequest,
+      companiesRequest,
+    ]);
+    state.projects = backendProjects;
+    state.companies = backendCompanies;
     const allowedOrgans = new Set(COMPANY_LIST.map((company) => normalize(company.name)));
     const mappedRecords = dashboardResponse.records
-      .map((record) => mapDashboardRecord(record))
+      .map((record) => mapDashboardRecord(record, backendProjects))
       .filter((record) => allowedOrgans.has(normalize(record.organ)));
     const updatedAtFromPayload = normalizeIsoDateTime(
       firstNonEmpty(
@@ -558,7 +666,12 @@ async function loadDashboardData() {
 
     dashboardData.records = mappedRecords;
     dashboardData.historyByProtocol = {};
-    dashboardData.projects = [...new Set(mappedRecords.map((record) => record.project))].sort();
+    dashboardData.projects = [
+      ...new Set([
+        ...backendProjects.map((project) => project.nome || project.name).filter(Boolean),
+        ...mappedRecords.map((record) => record.project).filter((project) => project && project !== "-"),
+      ]),
+    ].sort();
     dashboardData.loaded = true;
     dashboardData.lastUpdatedAt =
       updatedAtFromPayload ||
@@ -591,11 +704,15 @@ async function loadProtocolsByCompany(companyId) {
 
   if (shouldUseApi()) {
     try {
-      const [backendProtocols, backendProjects] = await Promise.all([
+      const projectsRequest = typeof api.getProjects === "function" ? api.getProjects().catch(() => []) : Promise.resolve([]);
+      const companiesRequest = typeof api.getCompanies === "function" ? api.getCompanies().catch(() => []) : Promise.resolve([]);
+      const [backendProtocols, backendProjects, backendCompanies] = await Promise.all([
         api.getProtocols(companyId),
-        api.getProjects?.().catch(() => []) || Promise.resolve([]),
+        projectsRequest,
+        companiesRequest,
       ]);
       state.projects = backendProjects;
+      state.companies = backendCompanies;
       const protocols = backendProtocols.map((protocol) => mapBackendProtocol(protocol, backendProjects));
       // Filtra por empresa ativa; se o backend retornar todos, filtra aqui
       const companyProtocols = protocols.filter(
@@ -730,7 +847,7 @@ function buildDashboardRecords() {
       ...record,
       id: record.id || `${record.number || "sem-numero"}-${index}`,
       historyRef: record.historyRef || record.id || record.number,
-      project: record.project || "-",
+      project: record.project && record.project !== "-" ? record.project : "Sem projeto vinculado",
       organ: record.organ || "-",
       number: record.number || "-",
       statusCurrent: record.statusCurrent || "Sem status",
@@ -850,15 +967,11 @@ function renderDashboard() {
   const situationsPresent = new Set(allRecords.map((record) => dashboardSituation(record)));
   const situations = situationOrder.filter((situation) => situationsPresent.has(situation));
 
-  if (projects.length) {
-    populateDashboardSelect(els.dashFilterProject, projects);
-  } else {
-    setDashboardSelectSingleOption(els.dashFilterProject, "Sem projeto vinculado");
-  }
+  populateDashboardSelect(els.dashFilterProject, projects);
   populateDashboardSelect(els.dashFilterOrgan, organsList);
   populateDashboardSelect(els.dashFilterStatus, statuses);
   populateDashboardSelect(els.dashFilterSituation, situations);
-  if (els.dashFilterProject) els.dashFilterProject.disabled = projects.length === 0;
+  if (els.dashFilterProject) els.dashFilterProject.disabled = false;
   if (els.dashFilterPeriod) els.dashFilterPeriod.disabled = false;
   syncDashboardFilterState();
 
@@ -1052,6 +1165,8 @@ function renderDetails() {
       <div><dt>Setor</dt><dd>${escapeHtml(protocol.department)}</dd></div>
       <div><dt>Abertura</dt><dd>${formatDate(protocol.openedAt)}</dd></div>
       <div><dt>Status</dt><dd><span class="pill ${statusClass(protocol.status)}">${escapeHtml(protocol.status)}</span></dd></div>
+      <div><dt>Tipo consulta</dt><dd>${escapeHtml(protocol.queryType || "-")}</dd></div>
+      <div><dt>Link consulta</dt><dd>${escapeHtml(protocol.queryUrl || "-")}</dd></div>
       <div class="wide"><dt>Assunto</dt><dd>${escapeHtml(protocol.subject)}</dd></div>
       <div class="wide"><dt>Observacoes</dt><dd>${escapeHtml(protocol.notes || "-")}</dd></div>
     </dl>
@@ -1086,7 +1201,7 @@ function renderCompanyFilters() {
 }
 
 function renderCompanyFilterLabel(company) {
-  const lines = company.filterLabel || [company.name];
+  const lines = Array.isArray(company.filterLabel) ? company.filterLabel : [company.name];
   return lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("");
 }
 
@@ -1113,8 +1228,23 @@ function populateOrgans() {
   els.organInput.innerHTML = organs.map((organ) => `<option>${organ}</option>`).join("");
 }
 
+function populateProjects(selectedProjectId = "") {
+  if (!els.projectInput) return;
+  const options = state.projects
+    .map((project) => `<option value="${escapeHtml(project.id)}">${escapeHtml(projectName(project))}</option>`)
+    .join("");
+
+  els.projectInput.innerHTML = options || `<option value="">Nenhum projeto carregado</option>`;
+  els.projectInput.disabled = state.projects.length === 0;
+  if (selectedProjectId && state.projects.some((project) => String(project.id) === String(selectedProjectId))) {
+    els.projectInput.value = selectedProjectId;
+  }
+}
+
 function openForm(protocol = null) {
   els.form.reset();
+  const selectedProject = fallbackProjectForProtocol(protocol);
+  populateProjects(selectedProject?.id || "");
   els.protocolId.value = protocol?.id || "";
   els.dialogTitle.textContent = protocol ? "Editar protocolo" : "Novo protocolo";
   els.numberInput.value = protocol?.number || nextProtocolNumber();
@@ -1122,9 +1252,22 @@ function openForm(protocol = null) {
   els.personInput.value = protocol?.person || "";
   els.documentInput.value = protocol?.document || "";
   els.organInput.value = protocol?.organ || state.company?.name || organs[0];
+  if (selectedProject?.id && els.projectInput) {
+    els.projectInput.value = selectedProject.id;
+  }
   els.departmentInput.value = protocol?.department || "";
   els.statusInput.value = protocol?.status || "Em andamento";
   els.priorityInput.value = protocol?.priority || "Media";
+  if (els.queryTypeInput) {
+    els.queryTypeInput.value = protocol?.queryType || protocol?.tipo_consulta || queryTypeForOrgan(els.organInput.value);
+  }
+  if (els.queryUrlInput) {
+    els.queryUrlInput.value =
+      protocol?.queryUrl ||
+      protocol?.link_consulta ||
+      defaultQueryUrlForType(els.queryTypeInput?.value) ||
+      "";
+  }
   els.subjectInput.value = protocol?.subject || "";
   els.notesInput.value = protocol?.notes || "";
   els.dialog.showModal();
@@ -1167,16 +1310,38 @@ async function handleSubmit(event) {
   const targetCompany = findCompanyByName(els.organInput.value) || state.company;
   const currentCompany = state.company;
   const wasExisting = state.protocols.some((item) => item.id === id);
+  const selectedProject = findProjectById(els.projectInput?.value);
+  if (!selectedProject) {
+    alert("Selecione um projeto antes de salvar o protocolo.");
+    return;
+  }
+  const backendCompanyId = backendCompanyIdForProject(selectedProject);
+  if (!backendCompanyId) {
+    alert("Nao foi possivel identificar a empresa do projeto selecionado.");
+    return;
+  }
+  const queryType = els.queryTypeInput?.value || "";
+  const queryUrl = els.queryUrlInput?.value.trim() || "";
+  if (queryType && !queryUrl) {
+    alert("Informe o link de consulta para ativar o scraping deste protocolo.");
+    return;
+  }
   const protocol = {
     id,
     number: els.numberInput.value.trim(),
     openedAt: els.openedAtInput.value,
     person: els.personInput.value.trim(),
     document: els.documentInput.value.trim(),
+    documentoConsulta: els.documentInput.value.trim(),
+    projectId: selectedProject.id,
+    companyId: backendCompanyId,
+    project: projectName(selectedProject),
     organ: targetCompany.name,
     department: els.departmentInput.value.trim(),
     status: els.statusInput.value,
     priority: els.priorityInput.value,
+    queryType,
+    queryUrl: queryType ? queryUrl : "",
     subject: els.subjectInput.value.trim(),
     notes: els.notesInput.value.trim(),
     updatedAt: new Date().toISOString(),
@@ -1193,7 +1358,8 @@ async function handleSubmit(event) {
     }
   } catch (error) {
     reportApiError("salvar protocolo", error);
-    alert("Nao foi possivel salvar no backend. Nenhuma alteracao local foi aplicada.");
+    const message = friendlyApiErrorMessage(error, "Nao foi possivel salvar no backend.");
+    alert(`Nao foi possivel salvar no backend: ${message}`);
     return;
   }
 
@@ -1321,9 +1487,12 @@ async function runDashboardQuery() {
   }
 
   try {
-    await api.runDashboard(state.company?.id);
+    const runResult = await api.runDashboard(state.company?.id).catch(() => ({ executed: false, items: [] }));
     await loadDashboardData();
     renderDashboard();
+    if (!runResult.executed && els.dashboardLastMeta) {
+      els.dashboardLastMeta.textContent = `${els.dashboardLastMeta.textContent} - scraping nao executado pelo backend`;
+    }
   } catch (error) {
     reportApiError("executar consulta", error);
     const message = friendlyApiErrorMessage(error, "Falha ao atualizar protocolos.");
@@ -1352,8 +1521,11 @@ async function refreshProtocolsNow() {
   }
 
   try {
-    await api.runDashboard(state.company.id);
+    const runResult = await api.runDashboard(state.company.id).catch(() => ({ executed: false, items: [] }));
     state.protocols = await loadProtocolsByCompany(state.company.id);
+    if (!runResult.executed && els.companyScopeLabel) {
+      els.companyScopeLabel.textContent = `${state.protocols.length} protocolo(s) carregado(s) do banco; scraping nao executado pelo backend`;
+    }
     if (state.selectedId && !state.protocols.some((protocol) => protocol.id === state.selectedId)) {
       state.selectedId = null;
     }
@@ -1416,6 +1588,250 @@ function exportDashboardCsv() {
   URL.revokeObjectURL(url);
 }
 
+function dashboardPdfFilterSummary() {
+  const filters = [];
+  if (dashboardUiState.project !== "todos") filters.push(`Projeto: ${dashboardUiState.project}`);
+  if (dashboardUiState.organ !== "todos") filters.push(`Orgao/site: ${dashboardUiState.organ}`);
+  if (dashboardUiState.status !== "todos") filters.push(`Status: ${dashboardUiState.status}`);
+  if (dashboardUiState.situation !== "todos") filters.push(`Situacao: ${dashboardUiState.situation}`);
+  if (dashboardUiState.period !== "todos") filters.push(`Periodo: ultimos ${dashboardUiState.period} dias`);
+  if (dashboardUiState.onlyChanged) filters.push("Somente com mudanca");
+  if (dashboardUiState.onlyError) filters.push("Somente com erro");
+  return filters.length ? filters.join(" | ") : "Todos os registros";
+}
+
+function generateDashboardPdf() {
+  syncDashboardFilterState();
+  const records = filteredDashboardRecords();
+  const total = records.length;
+  const finished = records.filter((record) => dashboardSituation(record) === "Finalizado").length;
+  const changed = records.filter((record) => record.changed).length;
+  const errors = records.filter((record) => record.error).length;
+  const lastRun = dashboardData.lastUpdatedAt || dashboardUiState.lastRunAt?.toISOString() || new Date().toISOString();
+  const generatedAt = new Date().toISOString();
+
+  const rows = records.length
+    ? records
+        .map((record, index) => {
+          const situation = dashboardSituation(record);
+          return `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${escapeHtml(record.project)}</td>
+              <td>${escapeHtml(record.organ)}</td>
+              <td><strong>${escapeHtml(record.number)}</strong></td>
+              <td><span class="badge">${escapeHtml(record.statusCurrent)}</span></td>
+              <td>${escapeHtml(situation)}</td>
+              <td>${escapeHtml(record.observation || "-")}</td>
+              <td>${formatDateTime(record.consultedAt)}</td>
+              <td>${dashboardDuration(record)}</td>
+              <td>${dashboardBooleanLabel(record.changed)}</td>
+              <td>${dashboardBooleanLabel(record.error)}</td>
+            </tr>
+          `;
+        })
+        .join("")
+    : `<tr><td colspan="11" class="empty">Nenhum protocolo encontrado com os filtros atuais.</td></tr>`;
+
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Dashboard de Protocolos</title>
+        <style>
+          @page { size: A4 landscape; margin: 12mm; }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            color: #172033;
+            background: #ffffff;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+          }
+          .report-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            align-items: flex-start;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #1d4ed8;
+          }
+          .eyebrow {
+            margin: 0 0 4px;
+            color: #1d4ed8;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+          }
+          h1 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 24px;
+            line-height: 1.1;
+          }
+          .meta {
+            margin: 6px 0 0;
+            color: #475569;
+            font-size: 10px;
+            line-height: 1.5;
+          }
+          .summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin: 12px 0;
+          }
+          .card {
+            min-height: 52px;
+            padding: 10px 12px;
+            border: 1px solid #dbe5f2;
+            border-left: 4px solid #2563eb;
+            border-radius: 7px;
+            background: #f8fbff;
+          }
+          .card span {
+            display: block;
+            color: #64748b;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+          }
+          .card strong {
+            display: block;
+            margin-top: 4px;
+            color: #0f172a;
+            font-size: 20px;
+            line-height: 1;
+          }
+          .filters {
+            margin: 0 0 10px;
+            padding: 8px 10px;
+            border: 1px solid #dbe5f2;
+            border-radius: 7px;
+            color: #334155;
+            background: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+          thead { display: table-header-group; }
+          th {
+            padding: 7px 6px;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+            background: #eaf1fb;
+            font-size: 8px;
+            text-align: left;
+            text-transform: uppercase;
+          }
+          td {
+            padding: 7px 6px;
+            border: 1px solid #e2e8f0;
+            color: #1f2937;
+            font-size: 8.5px;
+            line-height: 1.25;
+            vertical-align: top;
+            word-break: break-word;
+          }
+          tbody tr:nth-child(even) td { background: #f8fafc; }
+          .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 999px;
+            color: #1d4ed8;
+            background: #dbeafe;
+            font-weight: 800;
+            white-space: nowrap;
+          }
+          .empty {
+            padding: 20px;
+            color: #64748b;
+            text-align: center;
+            font-weight: 800;
+          }
+          .col-index { width: 28px; }
+          .col-project { width: 120px; }
+          .col-organ { width: 95px; }
+          .col-number { width: 120px; }
+          .col-status { width: 82px; }
+          .col-situation { width: 95px; }
+          .col-date { width: 92px; }
+          .col-duration { width: 58px; }
+          .col-flag { width: 48px; }
+        </style>
+      </head>
+      <body>
+        <header class="report-header">
+          <div>
+            <p class="eyebrow">Relatorio gerencial</p>
+            <h1>Dashboard de Protocolos</h1>
+            <p class="meta">Ultima consulta: ${formatDateTime(lastRun)}<br />Gerado em: ${formatDateTime(generatedAt)}</p>
+          </div>
+          <div class="meta">Fonte: FastAPI<br />Registros filtrados: ${total}</div>
+        </header>
+
+        <section class="summary">
+          <article class="card"><span>Total</span><strong>${total}</strong></article>
+          <article class="card"><span>Finalizados</span><strong>${finished}</strong></article>
+          <article class="card"><span>Mudancas</span><strong>${changed}</strong></article>
+          <article class="card"><span>Erros</span><strong>${errors}</strong></article>
+        </section>
+
+        <div class="filters">${escapeHtml(dashboardPdfFilterSummary())}</div>
+
+        <table>
+          <thead>
+            <tr>
+              <th class="col-index">#</th>
+              <th class="col-project">Projeto</th>
+              <th class="col-organ">Orgao/site</th>
+              <th class="col-number">Protocolo</th>
+              <th class="col-status">Status</th>
+              <th class="col-situation">Situacao</th>
+              <th>Observacao</th>
+              <th class="col-date">Consulta</th>
+              <th class="col-duration">Duracao</th>
+              <th class="col-flag">Mudou</th>
+              <th class="col-flag">Erro</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  const frame = document.createElement("iframe");
+  frame.className = "dashboard-print-frame";
+  frame.setAttribute("aria-hidden", "true");
+  document.body.appendChild(frame);
+
+  const frameWindow = frame.contentWindow;
+  const frameDocument = frame.contentDocument || frameWindow?.document;
+  if (!frameWindow || !frameDocument) {
+    frame.remove();
+    alert("Nao foi possivel preparar o PDF neste navegador.");
+    return;
+  }
+
+  frameDocument.open();
+  frameDocument.write(html);
+  frameDocument.close();
+
+  const removeFrame = () => setTimeout(() => frame.remove(), 500);
+  frameWindow.onafterprint = removeFrame;
+  setTimeout(() => {
+    frameWindow.focus();
+    frameWindow.print();
+    removeFrame();
+  }, 250);
+}
+
 function importDashboardFile(file) {
   if (!file || !state.company) return;
   if (!shouldUseApi()) {
@@ -1437,20 +1853,34 @@ function importDashboardFile(file) {
       alert("Planilha sem registros para importar.");
       return;
     }
+    const selectedProject = state.projects[0];
+    const backendCompanyId = backendCompanyIdForProject(selectedProject);
+    if (!selectedProject || !backendCompanyId) {
+      alert("Importacao bloqueada: nenhum projeto carregado para vincular aos protocolos.");
+      return;
+    }
 
     const separator = lines[0].includes(";") ? ";" : lines[0].includes("\t") ? "\t" : ",";
     const imported = lines.slice(1).map((line) => {
       const cells = line.split(separator).map((cell) => cell.trim().replace(/^"|"$/g, ""));
+      const organ = cells[2] || state.company.name;
+      const queryType = queryTypeForOrgan(organ);
       return {
         id: createId(),
         number: cells[1] || nextProtocolNumber(),
         openedAt: new Date().toISOString().slice(0, 10),
         person: cells[0] || "-",
-        document: "",
-        organ: cells[2] || state.company.name,
+        document: cells[5] || "",
+        documentoConsulta: cells[5] || "",
+        projectId: selectedProject.id,
+        companyId: backendCompanyId,
+        project: projectName(selectedProject),
+        organ,
         department: "Importacao",
         status: cells[4] || "Em andamento",
         priority: "Media",
+        queryType,
+        queryUrl: cells[10] || defaultQueryUrlForType(queryType),
         subject: cells[3] || "-",
         notes: cells[9] || "",
         updatedAt: new Date().toISOString(),
@@ -1687,13 +2117,20 @@ function bindEvents() {
   els.closeDialogButton.addEventListener("click", closeForm);
   els.cancelButton.addEventListener("click", closeForm);
   els.form.addEventListener("submit", handleSubmit);
+  els.organInput?.addEventListener("change", () => applyQueryDefaultsForOrgan(true));
+  els.queryTypeInput?.addEventListener("change", () => {
+    if (els.queryUrlInput && !els.queryUrlInput.value) {
+      els.queryUrlInput.value = defaultQueryUrlForType(els.queryTypeInput.value);
+    }
+  });
   els.powerBiButton.addEventListener("click", openPowerBiDashboard);
   els.closePowerBiButton?.addEventListener("click", closePowerBiDialog);
   els.closeDashboardHistoryButton?.addEventListener("click", closeDashboardHistoryDialog);
   els.dashboardHistoryDialog?.addEventListener("cancel", closeDashboardHistoryDialog);
   els.dashboardRunButton?.addEventListener("click", runDashboardQuery);
-  els.dashboardPdfButton?.addEventListener("click", () => window.print());
+  els.dashboardPdfButton?.addEventListener("click", generateDashboardPdf);
   els.dashboardExportButton?.addEventListener("click", exportDashboardCsv);
+  els.dashboardCloseButton?.addEventListener("click", closePowerBiDialog);
   els.dashboardNewProtocolButton?.addEventListener("click", () => {
     closePowerBiDialog();
     openForm();

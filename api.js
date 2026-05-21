@@ -7,6 +7,10 @@
     return String(config.API_BASE_URL || "").replace(/\/+$/, "");
   }
 
+  function scrapingApiBaseUrl() {
+    return String(config.SCRAPING_API_BASE_URL || "").replace(/\/+$/, "");
+  }
+
   function isEnabled() {
     const baseUrl = apiBaseUrl();
     return Boolean(baseUrl && baseUrl.startsWith("http") && !baseUrl.includes("COLE_A_URL"));
@@ -32,7 +36,7 @@
 
     let response;
     try {
-      response = await fetch(`${apiBaseUrl()}${endpoint(name, options.params)}`, {
+      response = await fetch(`${options.baseUrl || apiBaseUrl()}${endpoint(name, options.params)}`, {
         method: options.method || "GET",
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,
@@ -47,7 +51,10 @@
     const data = contentType.includes("application/json") ? await response.json() : await response.text();
 
     if (!response.ok) {
-      const message = typeof data === "object" ? data.message || data.error : data;
+      const detail = Array.isArray(data?.detail)
+        ? data.detail.map((item) => `${(item.loc || []).join(".")}: ${item.msg}`).join("; ")
+        : data?.detail;
+      const message = typeof data === "object" ? data.message || data.error || detail : data;
       throw new Error(message || `Erro ${response.status} ao chamar API.`);
     }
 
@@ -66,7 +73,7 @@
         lastError = error;
         const message = String(error?.message || "");
         const isLast = index === names.length - 1;
-        const mayTryFallback = /\b404\b/i.test(message) || /\b405\b/i.test(message);
+        const mayTryFallback = /\b404\b/i.test(message) || /\b405\b/i.test(message) || /not found|method not allowed/i.test(message);
         if (!mayTryFallback || isLast) {
           throw error;
         }
@@ -85,7 +92,9 @@
   }
 
   function itemFromResponse(data, fallback) {
+    if (Array.isArray(data)) return data[0] || fallback;
     if (data?.protocol) return data.protocol;
+    if (Array.isArray(data?.dados)) return data.dados[0] || fallback;
     if (data?.data && !Array.isArray(data.data)) return data.data;
     return data || fallback;
   }
@@ -101,7 +110,8 @@
   }
 
   async function getProtocols(companyId) {
-    const data = await request("protocolsByCompany", { params: { companyId } });
+    const baseUrl = scrapingApiBaseUrl() || undefined;
+    const data = await request("protocolsByCompany", { params: { companyId }, baseUrl });
     return listFromResponse(data);
   }
 
@@ -110,14 +120,52 @@
     return listFromResponse(data);
   }
 
+  async function getCompanies() {
+    const data = await request("companies");
+    return listFromResponse(data);
+  }
+
+  function backendProtocolPayload(companyId, protocol) {
+    const empresaId = protocol.companyId || protocol.empresa_id || companyId;
+    const projetoId = protocol.projectId || protocol.projeto_id || protocol.project_id;
+    const queryType = protocol.queryType || protocol.tipo_consulta || "";
+    const queryUrl = protocol.queryUrl || protocol.link_consulta || "";
+    const documentoConsulta =
+      protocol.documentoConsulta ||
+      protocol.documento_consulta ||
+      protocol.document ||
+      protocol.documento ||
+      "";
+    const payload = {
+      empresa_id: empresaId,
+      projeto_id: projetoId,
+      numero_protocolo: protocol.number || protocol.numero_protocolo,
+      orgao: protocol.organ || protocol.orgao,
+      responsavel: protocol.person || protocol.responsavel,
+      atividade: protocol.subject || protocol.atividade,
+      status_atual: protocol.statusCurrent || protocol.status_atual || protocol.status,
+      situacao: protocol.notes || protocol.situacao || protocol.situationRaw || "",
+      anotacoes: protocol.notes || protocol.anotacoes || "",
+      data_abertura: protocol.openedAt || protocol.data_abertura || null,
+      ativo: protocol.ativo ?? true,
+    };
+
+    if (queryType) payload.tipo_consulta = queryType;
+    if (queryUrl) payload.link_consulta = queryUrl;
+    if (documentoConsulta) payload.documento_consulta = documentoConsulta;
+
+    return payload;
+  }
+
   async function saveProtocol(companyId, protocol, options = {}) {
     const isUpdate = options.isUpdate ?? Boolean(protocol.id);
     const data = await request(isUpdate ? "protocol" : "protocolsByCompany", {
-      method: isUpdate ? "PUT" : "POST",
+      method: isUpdate ? "PATCH" : "POST",
       params: { companyId, protocolId: protocol.id },
-      body: protocol,
+      body: backendProtocolPayload(companyId, protocol),
     });
-    return itemFromResponse(data, protocol);
+    const saved = itemFromResponse(data, protocol);
+    return { ...protocol, ...saved, id: saved?.id || protocol.id };
   }
 
   async function deleteProtocol(companyId, protocolId) {
@@ -128,16 +176,32 @@
   }
 
   async function runDashboard(companyId) {
-    const body = companyId ? { company_id: companyId } : undefined;
+    const runBaseUrl = scrapingApiBaseUrl() || undefined;
+    const body = {};
+
+    if (companyId) body.company_id = companyId;
+    if (runBaseUrl) {
+      const limit = Number(config.SCRAPING_RUN_LIMIT || 0);
+      body.headless = true;
+      body.background = config.SCRAPING_RUN_BACKGROUND !== false;
+      if (Number.isFinite(limit) && limit > 0) body.limit = limit;
+    }
+
     try {
       const data = await requestWithFallback("dashboardRun", ["dashboardRunApi"], {
         method: "POST",
-        body,
+        body: Object.keys(body).length ? body : undefined,
+        baseUrl: runBaseUrl,
       });
       return { executed: true, items: listFromResponse(data) };
     } catch (error) {
       const normalized = String(error?.message || "").toLowerCase();
-      if (normalized.includes("404") || normalized.includes("405")) {
+      if (
+        normalized.includes("404") ||
+        normalized.includes("405") ||
+        normalized.includes("not found") ||
+        normalized.includes("method not allowed")
+      ) {
         return { executed: false, items: [] };
       }
       throw error;
@@ -145,12 +209,13 @@
   }
 
   async function getDashboard() {
+    const baseUrl = scrapingApiBaseUrl() || undefined;
     const data = await requestWithFallback("dashboard", [
       "dashboardApi",
       "dashboardLegacy",
       "dashboardLegacyV2",
       "protocolsByCompany",
-    ]);
+    ], { baseUrl });
     return {
       raw: data,
       records: listFromResponse(data),
@@ -158,10 +223,19 @@
   }
 
   async function getDashboardHistory(protocolId) {
+    const baseUrl = scrapingApiBaseUrl() || undefined;
     const data = await requestWithFallback("dashboardHistory", ["dashboardHistoryApi"], {
       params: { protocolId },
+      baseUrl,
     });
-    return listFromResponse(data);
+    const history = listFromResponse(data);
+    const id = String(protocolId || "");
+    if (!id) return history;
+
+    return history.filter((entry) => {
+      const entryProtocolId = entry?.protocolo_id || entry?.protocol_id || entry?.protocolId;
+      return String(entryProtocolId || "") === id;
+    });
   }
 
   window.bpkApi = {
@@ -169,6 +243,7 @@
     login,
     getProtocols,
     getProjects,
+    getCompanies,
     saveProtocol,
     deleteProtocol,
     getDashboard,

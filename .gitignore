@@ -1,0 +1,5 @@
+.env
+scraping_prefeitura_toledo/.env
+__pycache__/
+*.pyc
+scraping_prefeitura_toledo/scraping_prefeitura_toledo/debug/

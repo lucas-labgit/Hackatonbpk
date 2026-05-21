@@ -1,8 +1,11 @@
 window.BPK_CONFIG = {
   API_BASE_URL: "https://hackatonbpk-1.onrender.com",
+  SCRAPING_API_BASE_URL: "http://127.0.0.1:8000",
+  SCRAPING_RUN_BACKGROUND: true,
+  SCRAPING_RUN_LIMIT: 6,
 
-  AUTH_ENABLED: true,
-  READ_ONLY_API: true,
+  AUTH_ENABLED: false,
+  READ_ONLY_API: false,
   AUTH_TOKEN_KEY: "bpk_auth_token",
 
   ENDPOINTS: {
@@ -10,13 +13,19 @@ window.BPK_CONFIG = {
     protocolsByCompany: "/api/protocolos",
     projects:           "/api/projetos",
     protocol:           "/api/protocolos/{protocolId}",
-    dashboard:          "/dashboard",
+    companies:          "/api/empresas",
+    history:            "/api/historico",
+    dashboard:          "/api/protocolos",
     dashboardApi:       "/api/dashboard",
     dashboardLegacy:    "/api/protocolos",
     dashboardLegacyV2:  "/protocolos",
-    dashboardRun:       "/consultas/executar",
-    dashboardRunApi:    "/api/consultas/executar",
-    dashboardHistory:   "/consultas/{protocolId}/historico",
+    dashboardRun:       "/api/consultas/executar",
+    dashboardRunApi:    "/consultas/executar",
+    dashboardHistory:   "/api/historico",
     dashboardHistoryApi:"/api/consultas/{protocolId}/historico",
+  },
+
+  CONSULTA_URLS: {
+    prefeitura_toledo: "",
   },
 };
