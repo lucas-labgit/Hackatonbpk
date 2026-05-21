@@ -1,0 +1,18 @@
+services:
+  - type: worker
+    name: hackatonbpk-scrapy
+    env: docker
+    plan: free
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: PREFEITURA_TOLEDO_CPF_CNPJ
+        sync: false
+      - key: FONTE
+        value: todas
+      - key: LIMIT
+        value: "0"
+      - key: WORKER_INTERVAL_SECONDS
+        value: "900"
