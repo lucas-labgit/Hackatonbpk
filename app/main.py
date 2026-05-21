@@ -13,7 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# rota inicial
+# home
 @app.get("/")
 def home():
     return {"mensagem": "api funcionando"}
@@ -32,12 +32,11 @@ def buscar_protocolos():
 
     return response.data
 
-# rota normal
+# protocolos
 @app.get("/protocolos")
 def listar_protocolos():
     return buscar_protocolos()
 
-# rota api
 @app.get("/api/protocolos")
 def listar_protocolos_api():
     return buscar_protocolos()
@@ -68,12 +67,12 @@ def listar_empresas_api():
 
     return response.data
 
-# historico
+# histórico
 @app.get("/api/historico")
 def listar_historico_api():
     response = (
         supabase
-        .table("historico")
+        .table("historico_consultas")
         .select("*")
         .limit(50)
         .execute()
