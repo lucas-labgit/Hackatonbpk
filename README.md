@@ -1,4 +1,4 @@
-﻿# Hackatonbpk
+# Hackatonbpk
 
 # Base de Protocolos Públicos
 
@@ -21,6 +21,19 @@ O projeto foi criado para centralizar protocolos de diferentes órgãos em uma �
 - Integração com API FastAPI.
 - Integração com banco Supabase.
 - Scraping automatizado para consulta de protocolos da Prefeitura de Toledo.
+
+## Equipe
+
+Projeto desenvolvido em equipe no Hackathon BPK (2026).
+
+| Integrante | Responsabilidades |
+|---|---|
+| [Lucas Gabriel Teixeira da Silva](https://github.com/lucas-labgit) | Front-end em HTML, CSS e JavaScript: login, cadastro e busca de protocolos, dashboard, filtros e exportação para Excel e PDF |
+| [Rafael Lazarin](https://github.com/Rafael-Casarin) | Integração do front-end com a API e com o fluxo de scraping |
+| [Samuel Malta](https://github.com/samuyzx) | Backend em FastAPI e banco de dados no Supabase |
+| [Roger Oliveira](https://github.com/rcoliveirasb) | Robô de scraping da Prefeitura de Toledo |
+| [Gabriel Schraider](https://github.com/gschr4y) | Robô de scraping |
+| Rafael Cassiano | Organização e coordenação da equipe |
 
 ## Empresas/órgãos disponíveis
 
